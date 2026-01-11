@@ -1,0 +1,359 @@
+index.html.
+import React, { useState, useRef, useEffect } from 'react';
+import { User, Group, GroupComment, LeaderboardEntry } from '../types';
+
+interface CommunityProps {
+  currentUser: User;
+  groups: Group[];
+  leaderboard: LeaderboardEntry[];
+  onJoinGroup: (code: string) => void;
+  onCreateGroup: (name: string, max: number) => void;
+  onPostComment: (groupId: string, text: string, image?: string) => void;
+  onKickMember: (groupId: string, userId: string) => void;
+}
+
+const Community: React.FC<CommunityProps> = ({ 
+  currentUser, 
+  groups, 
+  leaderboard, 
+  onJoinGroup, 
+  onCreateGroup, 
+  onPostComment,
+  onKickMember
+}) => {
+  const [tab, setTab] = useState<'groups' | 'leaderboard'>('groups');
+  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [commentText, setCommentText] = useState('');
+  const [commentImage, setCommentImage] = useState<string | undefined>();
+  const [joinCode, setJoinCode] = useState('');
+  const [newGroupName, setNewGroupName] = useState('');
+  const [maxMembers, setMaxMembers] = useState(10);
+  const [isCreating, setIsCreating] = useState(false);
+  
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [selectedGroup?.comments]);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setCommentImage(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handlePost = () => {
+    if (!selectedGroup || (!commentText && !commentImage)) return;
+    onPostComment(selectedGroup.id, commentText, commentImage);
+    setCommentText('');
+    setCommentImage(undefined);
+  };
+
+  const myGroups = groups.filter(g => g.memberIds.includes(currentUser.id));
+
+  return (
+    <div className="flex flex-col h-full bg-[#f8fafc] overflow-hidden">
+      {/* Tab Navigation */}
+      <div className="flex border-b border-slate-200 bg-white sticky top-0 z-10">
+        <button 
+          onClick={() => { setTab('groups'); setSelectedGroup(null); }}
+          className={`flex-1 py-4 text-[11px] font-black transition-all flex items-center justify-center gap-2 ${tab === 'groups' ? 'text-emerald-600 border-b-4 border-emerald-600 bg-emerald-50/30' : 'text-slate-400'}`}
+        >
+          🏘️ مجموعاتي الدراسية
+        </button>
+        <button 
+          onClick={() => setTab('leaderboard')}
+          className={`flex-1 py-4 text-[11px] font-black transition-all flex items-center justify-center gap-2 ${tab === 'leaderboard' ? 'text-emerald-600 border-b-4 border-emerald-600 bg-emerald-50/30' : 'text-slate-400'}`}
+        >
+          🏆 المنافسة الأسبوعية
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
+        {tab === 'groups' ? (
+          !selectedGroup ? (
+            <div className="p-4 space-y-6">
+              {/* Actions Section */}
+              <div className="grid grid-cols-1 gap-4">
+                <div className="bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm">
+                  <h4 className="text-xs font-black text-slate-800 mb-3 flex items-center gap-2">
+                    <span className="text-emerald-500">🔑</span> دخول مجموعة خاصة
+                  </h4>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      placeholder="أدخل كود المجموعة هنا..." 
+                      value={joinCode}
+                      onChange={e => setJoinCode(e.target.value)}
+                      className="flex-1 bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                    />
+                    <button 
+                      onClick={() => onJoinGroup(joinCode)} 
+                      className="bg-emerald-600 text-white px-6 rounded-2xl text-xs font-black hover:bg-emerald-700 active:scale-95 transition-all"
+                    >
+                      دخول
+                    </button>
+                  </div>
+                </div>
+                
+                <button 
+                  onClick={() => setIsCreating(true)} 
+                  className="w-full bg-[#121212] text-white py-4 rounded-[2rem] text-xs font-black flex items-center justify-center gap-2 hover:bg-slate-800 transition-all shadow-lg"
+                >
+                  ➕ إنشاء قاعة دراسة جديدة
+                </button>
+              </div>
+
+              {/* Group List */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between px-2">
+                   <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">المجموعات المنضم إليها</h3>
+                   <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">{myGroups.length}</span>
+                </div>
+                
+                {myGroups.length === 0 ? (
+                  <div className="text-center py-16 text-slate-400 bg-white rounded-[2.5rem] border-2 border-dashed border-slate-200">
+                    <div className="text-4xl mb-4">🏠</div>
+                    <p className="text-sm font-bold">مازلت ما دخلتش لحتى مجموعة!</p>
+                    <p className="text-[10px] mt-1 px-8">أنشئ مجموعة مع صحابك وشاركو ملخصاتكم وأوقات دراستكم.</p>
+                  </div>
+                ) : (
+                  myGroups.map(g => (
+                    <div 
+                      key={g.id} 
+                      onClick={() => setSelectedGroup(g)}
+                      className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between cursor-pointer hover:border-emerald-300 transition-all active:scale-[0.98] group"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center text-xl font-black group-hover:rotate-6 transition-transform">
+                          {g.name[0]}
+                        </div>
+                        <div>
+                          <div className="font-black text-slate-800 text-sm">{g.name}</div>
+                          <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                            {g.memberIds.length} / {g.maxMembers} عضو
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[9px] bg-slate-100 px-3 py-1.5 rounded-xl font-black text-slate-500 uppercase tracking-tighter">
+                          كود: {g.inviteCode}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : (
+            /* Inside Selected Group (Full Chat UI) */
+            <div className="flex flex-col h-full bg-white relative">
+              <div className="p-4 border-b flex items-center justify-between bg-white shadow-sm sticky top-0 z-20">
+                <button onClick={() => setSelectedGroup(null)} className="p-2 hover:bg-slate-50 rounded-full transition-all text-slate-400">
+                  <span className="text-xl">🔙</span>
+                </button>
+                <div className="text-center">
+                  <div className="font-black text-slate-800 text-sm">{selectedGroup.name}</div>
+                  <div className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest mt-0.5">
+                    {selectedGroup.adminId === currentUser.id ? '👑 أنت مسير المجموعة' : 'قاعة دراسة خاصة'}
+                  </div>
+                </div>
+                <div className="p-2 text-xs font-black text-slate-300">#{selectedGroup.inviteCode}</div>
+              </div>
+
+              {/* Chat Area */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50 custom-scrollbar">
+                {selectedGroup.comments.length === 0 && (
+                  <div className="flex flex-col items-center justify-center h-full opacity-30">
+                    <span className="text-5xl mb-4">💬</span>
+                    <p className="text-xs font-black">ابداو المحادثة هنا!</p>
+                  </div>
+                )}
+                {selectedGroup.comments.map(c => (
+                  <div key={c.id} className={`flex flex-col ${c.userId === currentUser.id ? 'items-end' : 'items-start'}`}>
+                    <div className="flex items-center gap-2 mb-1 px-2">
+                      <span className={`text-[9px] font-black ${c.userId === selectedGroup.adminId ? 'text-amber-500' : 'text-emerald-600'}`}>
+                        {c.userId === selectedGroup.adminId ? '👑' : ''} {c.username}
+                      </span>
+                      {selectedGroup.adminId === currentUser.id && c.userId !== currentUser.id && (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); onKickMember(selectedGroup.id, c.userId); }} 
+                          className="text-[8px] bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-bold hover:bg-red-500 hover:text-white transition-all"
+                        >
+                          طرد
+                        </button>
+                      )}
+                    </div>
+                    <div className={`p-4 rounded-3xl max-w-[85%] shadow-sm relative group ${
+                      c.userId === currentUser.id 
+                        ? 'bg-emerald-600 text-white rounded-tr-none' 
+                        : 'bg-white border border-slate-100 rounded-tl-none text-slate-800'
+                    }`}>
+                      {c.image && (
+                        <div className="mb-2 overflow-hidden rounded-xl border border-black/5">
+                          <img src={c.image} className="max-h-64 w-full object-cover" alt="Group Share" />
+                        </div>
+                      )}
+                      <p className="text-sm leading-relaxed">{c.text}</p>
+                      <div className={`text-[8px] mt-2 opacity-40 font-bold ${c.userId === currentUser.id ? 'text-white text-left' : 'text-slate-400 text-right'}`}>
+                        {new Date(c.timestamp).toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Chat Input Interface */}
+              <div className="p-4 bg-white border-t border-slate-100 shadow-[0_-4px_10px_rgba(0,0,0,0.02)]">
+                {commentImage && (
+                  <div className="mb-3 relative inline-block animate-bounce-in">
+                    <img src={commentImage} className="w-20 h-20 object-cover rounded-2xl border-2 border-emerald-500 shadow-md" alt="Preview" />
+                    <button 
+                      onClick={() => setCommentImage(undefined)} 
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-lg font-black border-2 border-white"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+                <div className="flex gap-2 items-center">
+                  <input 
+                    type="file" 
+                    ref={fileRef} 
+                    className="hidden" 
+                    accept="image/*" 
+                    onChange={handleImageUpload} 
+                  />
+                  <button 
+                    onClick={() => fileRef.current?.click()} 
+                    className="w-12 h-12 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center hover:bg-emerald-50 hover:text-emerald-500 transition-all"
+                    title="مشاركة صورة"
+                  >
+                    🖼️
+                  </button>
+                  <input 
+                    type="text" 
+                    value={commentText}
+                    onChange={e => setCommentText(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handlePost()}
+                    placeholder="اكتب رسالتك للمجموعة..."
+                    className="flex-1 bg-slate-50 border-none rounded-2xl px-5 py-3.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  />
+                  <button 
+                    onClick={handlePost} 
+                    disabled={!commentText && !commentImage}
+                    className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center font-black shadow-lg shadow-emerald-100 active:scale-90 transition-all disabled:opacity-30"
+                  >
+                    🚀
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
+        ) : (
+          /* Leaderboard Tab */
+          <div className="p-4 space-y-4">
+             <div className="bg-[#121212] p-6 rounded-[2.5rem] text-white shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-8 opacity-5 text-8xl transform rotate-12">🏆</div>
+              <h4 className="text-emerald-400 font-black text-xs mb-1 uppercase tracking-widest">قائمة الشرف الأسبوعية</h4>
+              <p className="text-white/40 text-[9px] font-bold">يتم تصفير الترتيب كل أسبوع لتشجيع المنافسة العادلة!</p>
+              <div className="mt-4 flex items-center justify-between px-2">
+                <div className="text-center">
+                  <div className="text-xl font-black">{currentUser.weeklyMinutes}</div>
+                  <div className="text-[8px] opacity-40 uppercase">دقائقك الأسبوعية</div>
+                </div>
+                <div className="h-10 w-[1px] bg-white/10"></div>
+                <div className="text-center">
+                  <div className="text-xl font-black text-emerald-400">#{leaderboard.find(l => l.username === currentUser.username)?.rank || '-'}</div>
+                  <div className="text-[8px] opacity-40 uppercase">ترتيبك الحالي</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3 mt-6">
+              {leaderboard.map((entry, idx) => (
+                <div 
+                  key={entry.username} 
+                  className={`flex items-center gap-4 p-4 rounded-[2rem] bg-white border border-slate-100 shadow-sm transition-all ${
+                    entry.username === currentUser.username ? 'ring-2 ring-emerald-500 bg-emerald-50/30' : ''
+                  }`}
+                >
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg ${
+                    idx === 0 ? 'bg-amber-400 text-white shadow-lg shadow-amber-100' :
+                    idx === 1 ? 'bg-slate-300 text-white shadow-lg shadow-slate-100' :
+                    idx === 2 ? 'bg-orange-400 text-white shadow-lg shadow-orange-100' :
+                    'bg-slate-50 text-slate-400'
+                  }`}>
+                    {idx + 1}
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-black text-slate-800 text-sm flex items-center gap-2">
+                      {entry.username}
+                      {entry.level >= 3 && <span className="text-[8px] bg-[#121212] text-white px-2 py-0.5 rounded-full uppercase tracking-tighter">Pro</span>}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-bold">مستوى {entry.level} • {entry.minutes} دقيقة دراسة</div>
+                  </div>
+                  {idx < 3 && <span className="text-2xl">{['🥇', '🥈', '🥉'][idx]}</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Group Creation Modal */}
+      {isCreating && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-6 animate-fade-in">
+          <div className="bg-white w-full max-w-sm rounded-[3rem] p-8 shadow-2xl animate-bounce-in">
+            <h3 className="text-lg font-black mb-1 text-slate-800">إنشاء قاعة دراسة</h3>
+            <p className="text-[10px] text-slate-400 mb-6 font-bold uppercase tracking-widest">PRIVATE STUDY ROOM</p>
+            
+            <div className="space-y-5">
+              <div>
+                <label className="text-[9px] font-black text-slate-400 uppercase mb-2 mr-1 block">اسم المجموعة</label>
+                <input 
+                  type="text" 
+                  placeholder="مثلا: جيش العلوم 2025" 
+                  value={newGroupName} 
+                  onChange={e => setNewGroupName(e.target.value)} 
+                  className="w-full bg-slate-50 p-4 rounded-2xl border-none focus:ring-2 focus:ring-emerald-500 transition-all outline-none text-sm font-bold" 
+                />
+              </div>
+              
+              <div>
+                <label className="text-[9px] font-black text-slate-400 uppercase mb-2 mr-1 block">العدد الأقصى للأعضاء</label>
+                <input 
+                  type="number" 
+                  value={maxMembers} 
+                  onChange={e => setMaxMembers(parseInt(e.target.value))} 
+                  className="w-full bg-slate-50 p-4 rounded-2xl border-none focus:ring-2 focus:ring-emerald-500 transition-all outline-none text-sm font-bold" 
+                />
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <button 
+                  onClick={() => { if(newGroupName) { onCreateGroup(newGroupName, maxMembers); setIsCreating(false); } }}
+                  className="flex-1 bg-emerald-600 text-white py-4 rounded-2xl font-black text-sm shadow-xl shadow-emerald-100 hover:bg-emerald-700 active:scale-95 transition-all"
+                >تأكيد الإنشاء</button>
+                <button 
+                  onClick={() => setIsCreating(false)} 
+                  className="px-6 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black text-sm hover:bg-slate-200 transition-all"
+                >إلغاء</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Community;
