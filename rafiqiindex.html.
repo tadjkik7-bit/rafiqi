@@ -1,4 +1,4 @@
-index.html.
+
 import React, { useState, useRef, useEffect } from 'react';
 import { User, Group, GroupComment, LeaderboardEntry } from '../types';
 
